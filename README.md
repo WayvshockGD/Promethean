@@ -1,7 +1,7 @@
 ![Promethean-Banner-Transparent](https://user-images.githubusercontent.com/61085765/153244242-a0c5a77b-ad1e-4422-9760-d657e1e2fcf4.png)
 
 # Getting started 
-Since this library is not finsihed, you will have to build it yourself.
+Since this library is not finished, you will have to build it yourself.
 
 ```bash
 tsc --build
