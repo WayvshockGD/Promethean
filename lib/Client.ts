@@ -90,9 +90,6 @@ class Client extends EventClient {
             }
         }
 
-        console.log(data)
-        console.log(this.options)
-
         for (let id = 0; id < this.options.shards?.size!; id++) {
             this.shards.init(data, id);
         }

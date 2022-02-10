@@ -4,7 +4,8 @@
   "description": "A discord api wrapper for node.js",
   "main": "./index.js",
   "scripts": {
-    "test": "node ./build/test/Message.js"
+    "test": "node ./build/test/Message.js",
+    "tsc": "tsc --watch"
   },
   "keywords": [
     "API",

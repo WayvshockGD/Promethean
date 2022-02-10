@@ -46,11 +46,15 @@ export class Shard {
     public start() {
         this.ws.on("message", (data) => this.onMessage(JSON.parse(data.toString())));
         this.ws.on("open", () => this.onOpen());
-        this.ws.on("error", (err) => console.log(err));
+        this.ws.on("error", (err) => this.onError(err));
     }
 
     public onOpen() {
         this.state = "connecting";
+    }
+
+    public onError(err: Error) {
+        console.log(`${err.message} on Websocket`);
     }
 
     public onMessage(packet: GatewayReceivePayload) {
@@ -95,6 +99,9 @@ export class Shard {
             case GatewayDispatchEvents.ChannelCreate:
                 let channel = new Channel(packet.d, this.options.client);
                 this.options.client.channels.set(packet.d.id, channel.get());
+                break;
+            case GatewayDispatchEvents.GuildMemberUpdate:
+                let guild = this.options.client.guilds.get(packet.d.guild_id);
         }
     }
 
