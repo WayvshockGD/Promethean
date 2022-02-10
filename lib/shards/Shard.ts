@@ -102,6 +102,24 @@ export class Shard {
                 break;
             case GatewayDispatchEvents.GuildMemberUpdate:
                 let guild = this.options.client.guilds.get(packet.d.guild_id);
+
+                if (!guild) {
+                    if (this.options.client.options.debug) {
+                        console.log(`Unknown guild! ${packet.d.guild_id}`);
+                    }
+                    return;
+                }
+
+                let member = guild.members.get(packet.d.user.id);
+
+                if (!member) {
+                    if (this.options.client.options.debug){
+                        console.log(`Unknown member! ${packet.d.user.id}`);
+                    }
+                    return;
+                }
+
+                member._update(packet.d);
         }
     }
 
