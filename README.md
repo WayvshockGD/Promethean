@@ -21,3 +21,7 @@ client.on("message_create", (message) => {
            message.channel.createContent("Sir this is a wendy's"); // Embeds and components are not avalible just yet either
        }
 });
+```
+# Support
+
+If you are having a hard time with the library [join the server](https://discord.gg/rdJyVZhedg) and head to `#support`
