@@ -1,5 +1,7 @@
+import { GatewayGuildMemberUpdateDispatchData } from "discord-api-types";
 import EventEmitter from "node:events";
 import Guild from "./structures/Guild";
+import GuildMember from "./structures/GuildMember";
 import Message from "./structures/Message";
 import TextableChannel from "./structures/TextableChannel";
 
@@ -21,6 +23,7 @@ export class EventClient {
 
 export interface ClientEvents {
     ready: [];
-    message_create: [Message<TextableChannel>];
-    guild_create: [Guild]
+    message_create: [message: Message<TextableChannel>];
+    guild_create: [guild: Guild];
+    member_update: [oldMember: GatewayGuildMemberUpdateDispatchData, newMember: GuildMember];
 };

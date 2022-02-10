@@ -1,6 +1,8 @@
 import { APIGuildMember, GatewayGuildMemberUpdateDispatchData } from "discord-api-types/v9";
 import Client from "../Client";
 import Base from "./Base";
+import { AsNull } from "./Types";
+import User from "./User";
 
 export = class GuildMember extends Base {
     private data: APIGuildMember;
@@ -8,6 +10,10 @@ export = class GuildMember extends Base {
     public id: string | null;
 
     public name: string | null;
+
+    public premiumSince: AsNull<string>;
+
+    public user: AsNull<User>;
 
     public constructor(data: APIGuildMember, client: Client) {
         super(client);
@@ -17,9 +23,18 @@ export = class GuildMember extends Base {
         this.id = data.user?.id ?? null;
 
         this.name = data.user?.username ?? null;
+
+        this.premiumSince = data.premium_since ?? null;
+
+        if (data.user) {
+            this.user = new User(data.user, client);
+        } else {
+            this.user = null;
+        }
     }
 
     public _update(data: GatewayGuildMemberUpdateDispatchData) {
         this.name = data.user.username;
+        return this;
     }
 }

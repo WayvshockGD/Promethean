@@ -2,6 +2,7 @@ import {
     APIGatewayBotInfo,
     GatewayDispatchEvents,
     GatewayDispatchPayload,
+    GatewayGuildMemberUpdateDispatchData,
     GatewayHeartbeat,
     GatewayIdentify,
     GatewayOpcodes, 
@@ -119,7 +120,13 @@ export class Shard {
                     return;
                 }
 
+                let oldMember: GatewayGuildMemberUpdateDispatchData = {
+                    premium_since: member.premiumSince,
+                };
+
                 member._update(packet.d);
+
+                this.options.client.emit("member_update", oldMember, member);
         }
     }
 
