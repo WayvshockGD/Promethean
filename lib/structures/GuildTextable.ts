@@ -5,7 +5,7 @@ import { resolveChannelType } from "../util/Constants";
 import Base from "./Base";
 import { ChannelTypes, WrappedMessageContent } from "./Types";
 
-export = class GuildTexable extends Base {
+class GuildTexable extends Base {
     private data: APIChannel;
     private handler: MessageHandler;
 
@@ -13,6 +13,7 @@ export = class GuildTexable extends Base {
         super(client);
         
         this.data = data;
+
         this.handler = new MessageHandler(client, this.id);
     }
 
@@ -32,3 +33,5 @@ export = class GuildTexable extends Base {
         return this.data.id;
     }
 }
+
+export = GuildTexable;

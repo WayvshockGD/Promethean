@@ -1,4 +1,4 @@
-import { APIMessage, ChannelType } from "discord-api-types/v9"
+import { APIEmoji, APIMessage, ChannelType, RESTPostAPIGuildEmojiJSONBody, Routes } from "discord-api-types/v9"
 import Client from "../Client";
 import Base from "./Base";
 import { Channels } from "./Channel";
@@ -7,7 +7,7 @@ import TextableChannel from "./TextableChannel";
 import { Uncached, VerifyChannelType, VerifyGuild } from "./Types";
 import User from "./User";
 
-class Message<T extends Channels = TextableChannel, G = Guild> extends Base {
+class Message<T extends Channels, G = Guild> extends Base {
     private data: APIMessage;
 
     public channel: VerifyChannelType<T>;
@@ -54,6 +54,17 @@ class Message<T extends Channels = TextableChannel, G = Guild> extends Base {
 
     public get id() {
         return this.data.id;
+    }
+
+    public async createReaction(emoji: string) {
+        let request = this.client.rest
+            .request<{}>(
+                Routes.channelMessageOwnReaction(this.channel.id, this.id, emoji),
+                "POST",
+                true
+            );
+
+        await request.make();
     }
 }
 

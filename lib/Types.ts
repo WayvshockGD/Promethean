@@ -9,4 +9,4 @@ export interface ClientOptions {
     debug?: boolean;
 }
 
-type ShardOptions = "auto" | "manual";
+export type ShardOptions = "auto" | "manual";

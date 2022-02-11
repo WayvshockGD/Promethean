@@ -8,6 +8,7 @@ import VoiceChannel from "./VoiceChannel";
 export type Uncached = { id?: string };
 
 export type AsNull<T> = T | null; 
+export type asNullAndUndefined<T> = T | undefined | null;
 
 export type VerifyChannelType<T extends Channels> = T extends TextableChannel
      ? TextableChannel : T extends GuildTexable 
@@ -22,9 +23,22 @@ export type ChannelTypes = "guild_text" | "voice";
 
 export interface MessageContent {
     content: string;
+    embeds?: PrometheanEmbed[];
+    embed?: PrometheanEmbed;
+}
+
+export interface PrometheanEmbed {
+    title: string;
+    description?: string;
+    fields: PrometheanEmbedField[];
+}
+
+export interface PrometheanEmbedField {
+    name: string;
+    value: string;
+    inline?: boolean;
 }
 
 export interface PartialGuildMember {
     premiumSince: AsNull<string>;
-    user: AsNull<User>;
 }

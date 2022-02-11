@@ -7,6 +7,7 @@ import { GuildCache } from "./caches/GuildCache";
 import PrometheanClientError from "./errors/PrometheanClientError";
 import PrometheanError from "./errors/PrometheanError";
 import { EventClient } from "./EventClient";
+import { ClientPresenceHandler } from "./handlers/ClientPresenceHandler";
 
 import RequestClient from "./rest/RequestClient";
 import ShardClient from "./shards/ShardClient";
@@ -23,6 +24,8 @@ class Client extends EventClient {
 
     public guilds: GuildCache;
 
+    public shards: ShardClient;
+
     public constructor(token: string) {
         super(true);
 
@@ -35,14 +38,16 @@ class Client extends EventClient {
         this.channels = new ChannelCache(this);
 
         this.guilds = new GuildCache(this);
+
+        this.shards = new ShardClient(this);
     }
 
     get rest() {
         return new RequestClient(this);
     }
 
-    get shards() {
-        return new ShardClient(this);
+    get presence() {
+        return new ClientPresenceHandler(this);
     }
 
     public setOptions(options: ClientOptions) {

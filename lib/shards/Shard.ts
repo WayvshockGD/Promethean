@@ -6,17 +6,23 @@ import {
     GatewayHeartbeat,
     GatewayIdentify,
     GatewayOpcodes, 
-    GatewayReceivePayload 
+    GatewayPresenceUpdateData, 
+    GatewayReceivePayload, 
+    GatewayResume, 
+    GatewayResumeData
 } from "discord-api-types/v9";
 
 import WebSocket from "ws";
 import Client from "../Client";
 import * as ClientIntents from "../client/ClientIntents";
+import { PresenceIndicators, PresenceOptions } from "../handlers/ClientPresenceHandler";
 import { makeToken } from "../rest/RequestHandler";
 import { Channel } from "../structures/Channel";
 import ClientUser from "../structures/ClientUser";
 import Guild from "../structures/Guild";
 import Message from "../structures/Message";
+import { PartialGuildMember } from "../structures/Types";
+import { API_VERSION } from "../util/Constants";
 
 export class Shard {
     public options: ShardOptions;
@@ -24,6 +30,9 @@ export class Shard {
     public seq: number | null;
     public session_id: string | null;
     public state: "closed" | "connecting" | "connected";
+    public client: Client;
+    public latency: number;
+
     public ws: WebSocket;
 
     public constructor(options: ShardOptions) {
@@ -32,8 +41,10 @@ export class Shard {
         this.seq = null;
         this.session_id = null;
         this.state = "closed";
+        this.client = options.client;
+        this.latency = 0;
 
-        this.ws = new WebSocket(options.data.url + '/');
+        this.ws = new WebSocket(options.data.url + '/' + `?v=${API_VERSION}` + "&encoding=json");
     }
 
     public get id() {
@@ -48,24 +59,37 @@ export class Shard {
         this.ws.on("message", (data) => this.onMessage(JSON.parse(data.toString())));
         this.ws.on("open", () => this.onOpen());
         this.ws.on("error", (err) => this.onError(err));
+        this.ws.on("close", (code, reason) => this.onClose(code, reason.toString("utf-8")));
     }
 
     public onOpen() {
         this.state = "connecting";
+        this.client.emit("shard_status_change", "connecting", this.id);
+    }
+
+    public initStatus(options: GatewayPresenceUpdateData) {
+        this.send({ op: GatewayOpcodes.PresenceUpdate, d: options });
     }
 
     public onError(err: Error) {
-        console.log(`${err.message} on Websocket`);
+        this.client.emit("error", err);
+    }
+
+    public onClose(code: number, reason: string) {
+        if (this.client.options.debug) {
+            console.log(`${code} - ${reason}`);
+        }
     }
 
     public onMessage(packet: GatewayReceivePayload) {
         switch (packet.op) {
             case GatewayOpcodes.Hello:
-                this.heartbeat(packet.d.heartbeat_interval);
                 this.identify();
+                this.heartbeat(false, packet.d.heartbeat_interval);
                 break;
             case GatewayOpcodes.Dispatch:
                 this.onPacket(packet);
+                break;
         }
     }
 
@@ -75,37 +99,38 @@ export class Shard {
                 this.seq = packet.s;
                 this.session_id = packet.d.session_id;
                 this.state = "connected";
-                this.options.client.user = new ClientUser(packet.d.user);
-                this.options.client.emit("ready");
+                this.client.emit("shard_status_change", "connected", this.id);
+                this.client.user = new ClientUser(packet.d.user);
+                this.client.emit("ready");
                 break;
             case GatewayDispatchEvents.MessageCreate:
-                let message = new Message(packet.d, this.options.client);
-                this.options.client.emit("message_create", message);
+                let message = new Message(packet.d, this.client);
+                this.client.emit("message_create", message);
                 break;
             case GatewayDispatchEvents.GuildCreate:
                 if (!packet.d.unavailable) {
-                    let guild = new Guild(packet.d, this.options.client);
+                    let guild = new Guild(packet.d, this.client);
                     
                     if (packet.d.channels && packet.d.channels.length) {
                         for (let channel of packet.d.channels) {
-                            let data = new Channel(channel, this.options.client);
+                            let data = new Channel(channel, this.client);
                             guild.channels.set(channel.id, data.get());
-                            this.options.client.channels.set(channel.id, data.get());
+                            this.client.channels.set(channel.id, data.get());
                         }
                     }
 
-                    this.options.client.emit("guild_create", guild);
+                    this.client.emit("guild_create", guild);
                 }
                 break;
             case GatewayDispatchEvents.ChannelCreate:
-                let channel = new Channel(packet.d, this.options.client);
-                this.options.client.channels.set(packet.d.id, channel.get());
+                let channel = new Channel(packet.d, this.client);
+                this.client.channels.set(packet.d.id, channel.get());
                 break;
             case GatewayDispatchEvents.GuildMemberUpdate:
-                let guild = this.options.client.guilds.get(packet.d.guild_id);
+                let guild = this.client.guilds.get(packet.d.guild_id);
 
                 if (!guild) {
-                    if (this.options.client.options.debug) {
+                    if (this.client.options.debug) {
                         console.log(`Unknown guild! ${packet.d.guild_id}`);
                     }
                     return;
@@ -114,51 +139,79 @@ export class Shard {
                 let member = guild.members.get(packet.d.user.id);
 
                 if (!member) {
-                    if (this.options.client.options.debug){
+                    if (this.client.options.debug) {
                         console.log(`Unknown member! ${packet.d.user.id}`);
                     }
                     return;
                 }
 
-                let oldMember: GatewayGuildMemberUpdateDispatchData = {
-                    premium_since: member.premiumSince,
+                let oldMember: PartialGuildMember = {
+                    premiumSince: member.premiumSince,
                 };
 
-                member._update(packet.d);
+                member = member._update(packet.d);
 
-                this.options.client.emit("member_update", oldMember, member);
+                if (!oldMember.premiumSince && member.premiumSince) {
+                    this.client.emit("guild_member_boost", member);
+                }
+
+                if (oldMember.premiumSince && !member.premiumSince) {
+                    this.client.emit("guild_member_unboost", member);
+                }
+
+                this.client.emit("member_update", oldMember, member);
         }
+    }
+
+    public resume() {
+        let data: GatewayResume = {
+            op: GatewayOpcodes.Resume,
+            d: {
+                token: makeToken(this.client.token),
+                seq: this.seq!,
+                session_id: this.session_id!
+            }
+        };
+
+        this.send(data);
     }
 
     public identify() {
         let data: GatewayIdentify = {
             op: 2,
             d: {
-                token: makeToken(this.options.client.token),
-                intents: ClientIntents.resolve(this.options.client.options.intents),
+                token: makeToken(this.client.token),
+                intents: ClientIntents.resolve(this.client.options.intents),
                 properties: {
                     $browser: "Promethean",
                     $device: "Promethean",
                     $os: process.platform,
                 },
-                large_threshold: 250
+                large_threshold: 250,
             }
         };
 
-        if (this.options.client.shards.size > 1) {
-            data.d.shard = [this.id, this.options.client.shards.size];
+        if (this.client.shards.size > 1) {
+            data.d.shard = [this.id, this.client.shards.size];
         }
 
         this.send(data);
     }
 
-    public heartbeat(time: number) {
-        if (!this.got_heartbeat) {
-            this.got_heartbeat = true;
-            setTimeout(() => this.send<GatewayHeartbeat>({
-                op: 11,
+    public heartbeat(once: boolean, time?: number) {
+        if (once && !time) {
+            this.send<GatewayHeartbeat>({
+                op: 1,
                 d: this.seq
-            }), time);
+            });
+        } else {
+            if (!this.got_heartbeat) {
+                this.got_heartbeat = true;
+                setTimeout(() => this.send<GatewayHeartbeat>({
+                    op: 1,
+                    d: this.seq
+                }), time);
+            }
         }
     }
 
