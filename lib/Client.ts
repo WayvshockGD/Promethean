@@ -16,6 +16,7 @@ import { ClientOptions } from "./Types";
 
 class Client extends EventClient {
     public token: string;
+    
     public options: ClientOptions;
 
     public user?: ClientUser;
@@ -79,10 +80,13 @@ class Client extends EventClient {
 
     public async connect() {
         this.checkToken();
-        let data = await this.rest.request<APIGatewayBotInfo>(Routes.gatewayBot(), "GET", true).make();
+        let data = await this.rest
+            .request<APIGatewayBotInfo>(Routes.gatewayBot(), "GET", true)
+            .make();
 
         if (this.options.shards && this.options.shards.type === "auto") {
-            if (!data) {
+            // data will be true just because the requesthandler returns an object
+            if (data && !data.shards) {
                 throw new PrometheanError("Autoshard failed from no data from discord");
             };
             this.options.shards.size = data.shards;

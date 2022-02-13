@@ -29,9 +29,9 @@ export interface MessageContent {
 }
 
 export interface PrometheanEmbed {
-    title: string;
+    title?: string;
     description?: string;
-    fields: PrometheanEmbedField[];
+    fields?: PrometheanEmbedField[];
 }
 
 export interface PrometheanEmbedField {

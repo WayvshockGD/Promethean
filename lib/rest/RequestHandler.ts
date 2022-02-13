@@ -1,6 +1,7 @@
 import got, { Method, OptionsOfTextResponseBody } from "got/dist/source";
 import PrometheanError from "../errors/PrometheanError";
 import { LIB_VERSION, URLS } from "../util/Constants";
+import { RatelimitDataTypes } from "./Types";
 
 export class RequestHandler<T, A> {
     public options: RequestOptions;
@@ -32,10 +33,20 @@ export class RequestHandler<T, A> {
         if (body) {
             options.body = JSON.stringify(body);
         }
-        
-        let res = await got(`${URLS.api}${this.options.route}`, options);
 
-        return typeof res.body === "string" ? JSON.parse(res.body) : res.body;
+        if (!this.options.ratelimits[this.options.route]) {
+            let res = await got(`${URLS.api}${this.options.route}`, options);
+            
+            let limit = res.headers["x-ratelimit-limit"];
+            let remaining = res.headers["x-ratelimit-remaining"];
+            let reset = res.headers["x-ratelimit-reset"];
+            let global = res.headers["x-ratelimit-global"];
+            console.log(parseInt(reset as string));
+
+            return typeof res.body === "string" ? JSON.parse(res.body) : res.body;
+        } else {
+            return {} as A;
+        }
     }
 }
 
@@ -52,6 +63,7 @@ export function makeToken(token: string) {
 export interface RequestOptions {
     route: string;
     method: Method;
+    ratelimits: RatelimitDataTypes;
     auth: {
         required: boolean;
         token: string;

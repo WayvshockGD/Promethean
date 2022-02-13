@@ -31,4 +31,5 @@ export interface ClientEvents {
     guild_member_boost: [member: GuildMember];
     guild_member_unboost: [member: GuildMember];
     error: [err: Error];
+    ratelimit: [];
 };
