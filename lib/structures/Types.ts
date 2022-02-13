@@ -4,6 +4,7 @@ import Guild from "./Guild";
 import GuildTexable from "./GuildTextable";
 import TextableChannel from "./TextableChannel";
 import VoiceChannel from "./VoiceChannel";
+import PrometheanMessageEmbed from "./PrometheanMessageEmbed";
 
 export type Uncached = { id?: string };
 
@@ -23,7 +24,7 @@ export type ChannelTypes = "guild_text" | "voice";
 
 export interface MessageContent {
     content: string;
-    embeds?: PrometheanEmbed[];
+    embeds?: PrometheanEmbed[] | PrometheanMessageEmbed;
     embed?: PrometheanEmbed;
 }
 

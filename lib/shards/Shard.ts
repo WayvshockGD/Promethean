@@ -1,15 +1,13 @@
-import { 
+import {
     APIGatewayBotInfo,
     GatewayDispatchEvents,
     GatewayDispatchPayload,
-    GatewayGuildMemberUpdateDispatchData,
     GatewayHeartbeat,
     GatewayIdentify,
-    GatewayOpcodes, 
-    GatewayPresenceUpdateData, 
-    GatewayReceivePayload, 
-    GatewayResume, 
-    GatewayResumeData
+    GatewayOpcodes,
+    GatewayPresenceUpdateData,
+    GatewayReceivePayload,
+    GatewayResume,
 } from "discord-api-types/v9";
 
 import WebSocket from "ws";
@@ -32,6 +30,7 @@ export class Shard {
     public state: "closed" | "connecting" | "connected";
     public client: Client;
     public latency: number;
+    public heartBeatTime: NodeJS.Timeout | undefined;
 
     public ws: WebSocket;
 
@@ -43,6 +42,7 @@ export class Shard {
         this.state = "closed";
         this.client = options.client;
         this.latency = 0;
+        this.heartBeatTime = undefined;
 
         this.ws = new WebSocket(options.data.url + '/' + `?v=${API_VERSION}` + "&encoding=json");
     }
@@ -84,8 +84,12 @@ export class Shard {
     public onMessage(packet: GatewayReceivePayload) {
         switch (packet.op) {
             case GatewayOpcodes.Hello:
-                this.identify();
-                this.heartbeat(false, packet.d.heartbeat_interval);
+                if (!this.session_id) {
+                    this.identify();
+                    this.heartbeat(false, packet.d.heartbeat_interval);
+                } else {
+                    this.resume();
+                }
                 break;
             case GatewayOpcodes.Dispatch:
                 this.onPacket(packet);
@@ -110,7 +114,7 @@ export class Shard {
             case GatewayDispatchEvents.GuildCreate:
                 if (!packet.d.unavailable) {
                     let guild = new Guild(packet.d, this.client);
-                    
+
                     if (packet.d.channels && packet.d.channels.length) {
                         for (let channel of packet.d.channels) {
                             let data = new Channel(channel, this.client);
@@ -164,6 +168,9 @@ export class Shard {
     }
 
     public resume() {
+        if (this.client.options.debug) {
+            console.log(`Resuming on gateway shard ${this.id}`);
+        }
         let data: GatewayResume = {
             op: GatewayOpcodes.Resume,
             d: {
@@ -174,6 +181,15 @@ export class Shard {
         };
 
         this.send(data);
+    }
+
+    // TODO: use this when the chance is there
+    public crush() {
+        this.ws.close(1000, "Promethean connection close");
+        if (this.heartBeatTime) {
+            clearInterval(this.heartBeatTime);
+        }
+        this.run();
     }
 
     public identify() {
@@ -207,7 +223,7 @@ export class Shard {
         } else {
             if (!this.got_heartbeat) {
                 this.got_heartbeat = true;
-                setTimeout(() => this.send<GatewayHeartbeat>({
+                this.heartBeatTime = setInterval(() => this.send<GatewayHeartbeat>({
                     op: 1,
                     d: this.seq
                 }), time);
