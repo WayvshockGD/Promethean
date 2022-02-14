@@ -42,7 +42,6 @@ export class RequestHandler<T, A> extends EventEmitter {
 
             let reset = res.headers["x-ratelimit-reset-after"] as string;
             let global = res.headers["x-ratelimit-global"] as string;
-            console.log(res.headers)
 
             this.options.ratelimits[this.options.route] = {
                 remaining: parseInt(reset)
