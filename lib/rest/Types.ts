@@ -1,5 +1,4 @@
-export type RatelimitDataTypes = {
-    [route: string]: {
-        remaining: number;
-    };
-};
+export type RatelimitDataTypes = Array<{
+    route: string;
+    remaining: number;
+}>;

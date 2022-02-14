@@ -1,26 +1,41 @@
 import EventEmitter from "node:events";
 import got, { Method, OptionsOfTextResponseBody } from "got/dist/source";
 import PrometheanError from "../errors/PrometheanError";
-import { LIB_VERSION, URLS } from "../util/Constants";
+import { DISCORD_CODES, LIB_VERSION, URLS } from "../util/Constants";
 import { RatelimitDataTypes } from "./Types";
+import DiscordError from "../errors/DiscordError";
+import DiscordRatelimitError from "../errors/DiscordRatelimitError";
+import Client from "../Client";
+import Util from "../util/Util";
+import Bucket from "../util/Bucket";
 
-export class RequestHandler<T, A> extends EventEmitter {
-    public options: RequestOptions;
+let sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-    public constructor(options: RequestOptions) {
+export class RequestHandler extends EventEmitter {
+    public client: Client;
+    public options?: RequestOptions;
+    public ratelimits: RatelimitDataTypes = [];
+    public rate: number;
+
+    public constructor(client: Client, options?: RequestOptions) {
         super();
 
+        this.client = client;
+
         this.options = options;
+
+        this.rate = 0;
     }
 
     get agent() {
         return `Promethean (${URLS.git}, ${LIB_VERSION})`;
     }
 
-    public async make(body?: T): Promise<A> {
+    public async make<TY, T = {}>(route: string, method: Method, auth: boolean, body?: T): Promise<TY> {
+        console.log(this.ratelimits)
         let options: OptionsOfTextResponseBody = {
             throwHttpErrors: false,
-            method: this.options.method,
+            method: method,
             headers: {
                 "content-type": "application/json",
                 "User-Agent": this.agent,
@@ -29,32 +44,54 @@ export class RequestHandler<T, A> extends EventEmitter {
             }
         };
 
-        if (this.options.auth.required) {
-            options.headers!["Authorization"] = makeToken(this.options.auth.token);
+        let bucket = new Bucket(route, this.ratelimits);
+
+        if (auth) {
+            options.headers!["Authorization"] = makeToken(this.client.token);
         }
 
         if (body) {
             options.body = JSON.stringify(body);
         }
 
-        if (!this.options.ratelimits[this.options.route]) {
-            let res = await got(`${URLS.api}${this.options.route}`, options);
+        this.rate++;
+        let res = await got(`${URLS.api}${route}`, options);
 
-            let reset = res.headers["x-ratelimit-reset-after"] as string;
-            let global = res.headers["x-ratelimit-global"] as string;
+        let reset = res.headers["x-ratelimit-reset-after"] as string;
+        let global = res.headers["x-ratelimit-global"] as string;
 
-            this.options.ratelimits[this.options.route] = {
-                remaining: parseInt(reset)
-            };
-
-            if (global) {
-                this.emit("ratelimit");
-            }
-
-            return typeof res.body === "string" ? JSON.parse(res.body) : res.body;
-        } else {
-            return {} as A;
+        if (global) {
+            this.emit("ratelimit");
         }
+
+        //if (this.ratelimits.find((o) => o.route === route)) {
+        //    let time = `${parseInt(reset)}000`;
+        //    console.log(this, parseInt(time));
+        //    await sleep(parseInt(time));
+        //    this.ratelimits = this.ratelimits.filter((val) => val.route != route);
+        //    return this.make(route, method, auth, body);
+        //}
+
+        if (this.rate > 1) {
+            this.rate = 0;
+            this.ratelimits = [];
+            setTimeout(() => {
+                return this.make(route, method, auth, body);
+            }, parseInt(`${parseInt(reset)}000`));
+        }
+
+        this.ratelimits.push({
+            route: route,
+            remaining: parseInt(reset)
+        });
+
+        if (res.statusCode !== 200 && res.statusCode !== 429) {
+            throw new DiscordError(res.statusCode, res.statusMessage);
+        } else if (res.statusCode === DISCORD_CODES.ratelimit) {
+            throw new DiscordRatelimitError(res.statusMessage!);
+        }
+
+        return typeof res.body === "string" ? JSON.parse(res.body) : res.body;
     }
 }
 
@@ -68,12 +105,4 @@ export function makeToken(token: string) {
     }
 }
 
-export interface RequestOptions {
-    route: string;
-    method: Method;
-    ratelimits: RatelimitDataTypes;
-    auth: {
-        required: boolean;
-        token: string;
-    }
-}
+export interface RequestOptions { }

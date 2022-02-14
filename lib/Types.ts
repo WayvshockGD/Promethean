@@ -1,4 +1,5 @@
 import { IntentStrings } from "./client/ClientIntents";
+import { RequestOptions } from "./rest/RequestHandler";
 
 export interface ClientOptions {
     intents: IntentStrings[];
@@ -7,6 +8,7 @@ export interface ClientOptions {
         size?: number;
     }
     debug?: boolean;
+    rest?: RequestOptions;
 }
 
 export type ShardOptions = "auto" | "manual";

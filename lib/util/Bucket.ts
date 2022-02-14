@@ -1,4 +1,5 @@
 import { RatelimitDataTypes } from "../rest/Types";
+import Util from "./Util";
 
 export = class Bucket {
     private route: string;
@@ -10,12 +11,18 @@ export = class Bucket {
     }
 
     public handle(time: number) {
-        if (!this.data[this.route]) {
+        let map = this.data.find(({ route }) => this.route === route);
+
+        if (!map) {
             return false;
         }
 
+        let d: RatelimitDataTypes;
+
         setTimeout(() => {
-            delete this.data[this.route];
+            d = this.data.filter((val) => val.route != this.route);
         }, time);
+
+        return d!;
     }
 }

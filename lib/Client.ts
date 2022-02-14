@@ -8,8 +8,7 @@ import PrometheanClientError from "./errors/PrometheanClientError";
 import PrometheanError from "./errors/PrometheanError";
 import { EventClient } from "./EventClient";
 import { ClientPresenceHandler } from "./handlers/ClientPresenceHandler";
-
-import RequestClient from "./rest/RequestClient";
+import { RequestHandler } from "./rest/RequestHandler";
 import ShardClient from "./shards/ShardClient";
 import ClientUser from "./structures/ClientUser";
 import { ClientOptions } from "./Types";
@@ -27,6 +26,8 @@ class Client extends EventClient {
 
     public shards: ShardClient;
 
+    public rest: RequestHandler;
+
     public constructor(token: string) {
         super(true);
 
@@ -41,10 +42,8 @@ class Client extends EventClient {
         this.guilds = new GuildCache(this);
 
         this.shards = new ShardClient(this);
-    }
 
-    get rest() {
-        return new RequestClient(this);
+        this.rest = new RequestHandler(this, this.options.rest);
     }
 
     get presence() {
@@ -81,8 +80,7 @@ class Client extends EventClient {
     public async connect() {
         this.checkToken();
         let data = await this.rest
-            .request<APIGatewayBotInfo>(Routes.gatewayBot(), "GET", true)
-            .make();
+            .make<APIGatewayBotInfo>(Routes.gatewayBot(), "GET", true);
 
         if (this.options.shards && this.options.shards.type === "auto") {
             // data will be true just because the requesthandler returns an object

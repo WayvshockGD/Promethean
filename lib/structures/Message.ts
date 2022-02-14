@@ -56,15 +56,29 @@ class Message<T extends Channels, G = Guild> extends Base {
         return this.data.id;
     }
 
+    public get isSelf() {
+        if (this.client.user) {
+            return this.author.username === this.client.user.username;
+        } else {
+            return false;
+        }
+    }
+
+    public async deleteContent() {
+        await this.client.rest.make(
+            Routes.channelMessage(this.channelID, this.id), 
+            "DELETE", 
+            true
+        )
+    }
+
     public async createReaction(emoji: string) {
-        let request = this.client.rest
-            .request<{}>(
+        await this.client.rest
+            .make(
                 Routes.channelMessageOwnReaction(this.channel.id, this.id, emoji),
                 "POST",
                 true
             );
-
-        await request.make();
     }
 }
 

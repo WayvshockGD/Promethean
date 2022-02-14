@@ -4,10 +4,9 @@ import CacheCollection from "../util/CacheCollection";
 
 export = class ChannelCache extends CacheCollection<Channels> {
     public async fetch(id: string, cache?: boolean) {
-        let request = this.client.rest
-            .request<APIChannel>(Routes.channel(id), "GET", true);
+        let data = await this.client.rest
+            .make<APIChannel>(Routes.channel(id), "GET", true);
         
-        let data = await request.make();
         let channel = new Channel(data, this.client).get();
 
         if (cache) {

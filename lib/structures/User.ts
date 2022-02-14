@@ -14,4 +14,8 @@ export = class User extends Base {
     public get id() {
         return this.data.id;
     }
+
+    public get username() {
+        return this.data.username;
+    }
 }

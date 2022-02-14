@@ -5,8 +5,12 @@ import CacheCollection from "../util/CacheCollection";
 export class GuildCache extends CacheCollection<Guild> {
     public async fetch(id: string, options: GuildFetchOptions = {}) {
         let data = await this.client.rest
-            .request<APIGuild, RESTGetAPIGuildQuery>(Routes.guild(id), "GET", true)
-            .make({ with_counts: options.with_counts });
+            .make<APIGuild, RESTGetAPIGuildQuery>(
+                Routes.guild(id), 
+                "GET", 
+                true,
+                { with_counts: options.with_counts }
+            );
 
         let guild = new Guild(data, this.client);
         

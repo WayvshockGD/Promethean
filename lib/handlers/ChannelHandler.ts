@@ -15,13 +15,13 @@ export = class MessageHandler {
     }
 
     public async createMessage(content: WrappedMessageContent): Promise<Message<TextableChannel>> {
-        let request = this.client.rest
-         .request<APIMessage, RESTPostAPIChannelMessageJSONBody>(
+        let data = await this.client.rest
+         .make<APIMessage, RESTPostAPIChannelMessageJSONBody>(
              Routes.channelMessages(this.id), 
              "POST",
-             true
+             true,
+             Content.parse(content)
         )
-        let data = await request.make(Content.parse(content));
         return new Message(data, this.client);
     }
 }
