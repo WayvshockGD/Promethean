@@ -72,13 +72,14 @@ export class RequestHandler extends EventEmitter {
         //    return this.make(route, method, auth, body);
         //}
 
-        if (this.rate > 1) {
-            this.rate = 0;
-            this.ratelimits = [];
-            setTimeout(() => {
-                return this.make(route, method, auth, body);
-            }, parseInt(`${parseInt(reset)}000`));
+        console.log(this.rate > 1, this.rate > 1);
+        let time = parseInt(`${parseInt(reset)}000`);
+
+        if (this.rate > 2) {
+            setTimeout(() => {this.make(route, method, auth, body);}, time);
         }
+        
+        setTimeout(() => {this.rate = 0;}, time);
 
         this.ratelimits.push({
             route: route,

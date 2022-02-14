@@ -16,6 +16,10 @@ export let AllIntents: IntentObject = {
     DirectMessages: 1 << 12,
     DirectMessageReactions: 1 << 13,
     DirectMessageTyping: 1 << 14,
+    /**
+     * GlobalMessage is needed as of API v10 and above
+     */
+    GlobalMessage: 1 << 15,
     GuildScheduledEvents: 1 << 16
 }
 
@@ -52,6 +56,7 @@ export type IntentStrings = "Guilds" |
                      "DirectMessages" |
                      "DirectMessageReactions" | 
                      "DirectMessageTyping" |
+                     "GlobalMessage" |
                      "GuildScheduledEvents";
 
 export type IntentObject = {
