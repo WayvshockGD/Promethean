@@ -19,6 +19,7 @@ class Message<T extends Channels, G = Guild> extends Base {
         
         this.data = data;
 
+        console.log(data)
         this.channel = client.channels.resolve(data.channel_id) as VerifyChannelType<T>;
 
         this.author = new User(data.author, client);

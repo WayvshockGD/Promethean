@@ -7,15 +7,24 @@ import DiscordError from "../errors/DiscordError";
 import DiscordRatelimitError from "../errors/DiscordRatelimitError";
 import Client from "../Client";
 import Util from "../util/Util";
-import Bucket from "../util/Bucket";
+import { RatelimitWait } from "../util/Bucket";
 
-let sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+let sleep = (ms: number) => {
+    let timeStart = new Date().getTime();
+    while (true) {
+      let elapsedTime = new Date().getTime() - timeStart;
+      if (elapsedTime > ms) {
+        break;
+      }
+    }
+};
 
 export class RequestHandler extends EventEmitter {
     public client: Client;
     public options?: RequestOptions;
     public ratelimits: RatelimitDataTypes = [];
     public rate: number;
+    public queues: (() => any)[];
 
     public constructor(client: Client, options?: RequestOptions) {
         super();
@@ -25,74 +34,86 @@ export class RequestHandler extends EventEmitter {
         this.options = options;
 
         this.rate = 0;
+
+        this.queues = [];
     }
 
     get agent() {
         return `Promethean (${URLS.git}, ${LIB_VERSION})`;
     }
 
+    public makeQueue() {
+        let fun = this.queues.shift();
+        if (fun) return fun();
+    }
+
     public async make<TY, T = {}>(route: string, method: Method, auth: boolean, body?: T): Promise<TY> {
-        console.log(this.ratelimits)
-        let options: OptionsOfTextResponseBody = {
-            throwHttpErrors: false,
-            method: method,
-            headers: {
-                "content-type": "application/json",
-                "User-Agent": this.agent,
-                "Accept-Encoding": "gzip,deflate",
-                "X-RateLimit-Precision": "millisecond"
+        return
+        let fun = async () => {
+            let options: OptionsOfTextResponseBody = {
+                throwHttpErrors: false,
+                method: method,
+                headers: {
+                    "content-type": "application/json",
+                    "User-Agent": this.agent,
+                    "Accept-Encoding": "gzip,deflate",
+                    "X-RateLimit-Precision": "millisecond"
+                }
+            };
+    
+            if (auth) {
+                options.headers!["Authorization"] = makeToken(this.client.token);
             }
+    
+            if (body) {
+                options.body = JSON.stringify(body);
+            }
+    
+            this.rate++;
+            let res = await got(`${URLS.api}${route}`, options);
+    
+            let reset = res.headers["x-ratelimit-reset-after"] as string;
+            let global = res.headers["x-ratelimit-global"] as string;
+    
+            if (global) {
+                this.emit("ratelimit");
+            }
+    
+            this.ratelimits.push({
+                route: route,
+                remaining: parseInt(reset)
+            });
+    
+            if (res.statusCode !== 200 && res.statusCode !== 201 && res.statusCode !== 429) {
+                throw new DiscordError(res.statusCode, res.statusMessage);
+            } else if (res.statusCode === DISCORD_CODES.ratelimit) {
+                throw new DiscordRatelimitError((res.statusMessage!), {
+                    reset: parseInt(reset),
+                    global: Boolean(global)
+                });
+            }
+    
+            return typeof res.body === "string" ? JSON.parse(res.body) : res.body;
         };
 
-        let bucket = new Bucket(route, this.ratelimits);
+        console.log(this.rate > 2, this.rate < 2);
+        console.group(this)
+        if (this.rate > 1) {
+            let map = this.ratelimits.find((op) => op.route === route);
 
-        if (auth) {
-            options.headers!["Authorization"] = makeToken(this.client.token);
+            if (map) {
+                console.log(this)
+                let bucket = new RatelimitWait<TY>({
+                    bucketSize: 1,
+                    refillTime: parseInt(`${map.remaining}000`),
+                });
+
+                bucket.wait().then(async () => {
+                    return await fun();
+                });
+            }
         }
-
-        if (body) {
-            options.body = JSON.stringify(body);
-        }
-
-        this.rate++;
-        let res = await got(`${URLS.api}${route}`, options);
-
-        let reset = res.headers["x-ratelimit-reset-after"] as string;
-        let global = res.headers["x-ratelimit-global"] as string;
-
-        if (global) {
-            this.emit("ratelimit");
-        }
-
-        //if (this.ratelimits.find((o) => o.route === route)) {
-        //    let time = `${parseInt(reset)}000`;
-        //    console.log(this, parseInt(time));
-        //    await sleep(parseInt(time));
-        //    this.ratelimits = this.ratelimits.filter((val) => val.route != route);
-        //    return this.make(route, method, auth, body);
-        //}
-
-        console.log(this.rate > 1, this.rate > 1);
-        let time = parseInt(`${parseInt(reset)}000`);
-
-        if (this.rate > 2) {
-            setTimeout(() => {this.make(route, method, auth, body);}, time);
-        }
-        
-        setTimeout(() => {this.rate = 0;}, time);
-
-        this.ratelimits.push({
-            route: route,
-            remaining: parseInt(reset)
-        });
-
-        if (res.statusCode !== 200 && res.statusCode !== 429) {
-            throw new DiscordError(res.statusCode, res.statusMessage);
-        } else if (res.statusCode === DISCORD_CODES.ratelimit) {
-            throw new DiscordRatelimitError(res.statusMessage!);
-        }
-
-        return typeof res.body === "string" ? JSON.parse(res.body) : res.body;
+        this.queues.push(fun);
     }
 }
 
